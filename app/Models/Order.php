@@ -21,7 +21,7 @@ class Order extends Model
         return $this->belongsToMany(Tiket::class, 'detail_orders')->withPivot('jumlah', 'subtotal_harga');
     }
 
-    public function events()
+    public function event()
     {
         return $this->belongsTo(Event::class);
     }
