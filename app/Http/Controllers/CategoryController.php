@@ -30,7 +30,7 @@ class CategoryController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'nama' => 'required|string|max:255|unique:kategoris,nama,' . $id,
+            'nama' => 'required|string|max:255|unique:kategoris,nama,'.$id,
         ]);
 
         $category = Kategori::findOrFail($id);

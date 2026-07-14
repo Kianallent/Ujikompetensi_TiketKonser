@@ -27,6 +27,4 @@ class Tiket extends Model
     {
         return $this->belongsToMany(Order::class, 'detail_orders')->withPivot('jumlah', 'subtotal_harga');
     }
-
-    
 }

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\EventFormRequest;
 use App\Models\Event;
 use App\Models\Kategori;
 use Illuminate\Http\Request;
-use App\Http\Requests\EventFormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,19 +13,19 @@ class EventController extends Controller
 {
     public function index(Request $request)
     {
-        $events = Event::with(['kategori','tikets'])
+        $events = Event::with(['kategori', 'tikets'])
             ->when($request->kategori_id, function ($query) use ($request) {
                 $query->where('kategori_id', $request->kategori_id);
             })
             ->when($request->search, function ($query) use ($request) {
                 $query->where(function ($q) use ($request) {
-                    $q->where('judul','like','%'.$request->search.'%')
-                    ->orWhere('lokasi','like','%'.$request->search.'%');
+                    $q->where('judul', 'like', '%' . $request->search . '%')
+                        ->orWhere('lokasi', 'like', '%' . $request->search . '%');
                 });
             })
             ->orderBy(
                 'tanggal_waktu',
-                $request->get('sort','asc')
+                $request->get('sort', 'asc')
             )
             ->paginate(10);
 
@@ -54,32 +54,28 @@ class EventController extends Controller
     {
         $gambar = 'konser.jpg';
 
-        if ($request->hasFile('gambar')) 
-        {
+        if ($request->hasFile('gambar')) {
             $gambar = $request
-            ->file('gambar')
-            ->store('events','public');
-
+                ->file('gambar')
+                ->store('events', 'public');
         }
 
         $event = Event::create([
-            'user_id'=>Auth::id(),
-            'kategori_id'=>$request->kategori_id,
-            'judul'=>$request->judul,
-            'deskripsi'=>$request->deskripsi,
-            'lokasi'=>$request->lokasi,
-            'gambar'=>$gambar,
-            'tanggal_waktu'=>$request->tanggal_waktu,
+            'user_id' => Auth::id(),
+            'kategori_id' => $request->kategori_id,
+            'judul' => $request->judul,
+            'deskripsi' => $request->deskripsi,
+            'lokasi' => $request->lokasi,
+            'gambar' => $gambar,
+            'tanggal_waktu' => $request->tanggal_waktu,
         ]);
 
-        foreach($request->tikets as $tiket)
-        {
+        foreach ($request->tikets as $tiket) {
             $event->tikets()->create([
-                'tipe'=>$tiket['tipe'],
-                'harga'=>$tiket['harga'],
-                'stok'=>$tiket['stok'],
+                'tipe' => $tiket['tipe'],
+                'harga' => $tiket['harga'],
+                'stok' => $tiket['stok'],
             ]);
-
         }
 
         return redirect()
@@ -98,126 +94,138 @@ class EventController extends Controller
         return view(
             'pages.admin.events.edit',
             [
-                'event'=>$event,
-                'kategoris'=>$kategoris,
-                'hasSales'=>$event->hasSales()
+                'event' => $event,
+                'kategoris' => $kategoris,
+                'hasSales' => $event->hasSales(),
             ]
         );
-
     }
 
     public function update(
         EventFormRequest $request,
         Event $event
-    ){
-        if(
+    ) {
+        if (
             $event->hasSales() &&
             $request->tanggal_waktu != $event->tanggal_waktu
-        ){
+        ) {
             return back()
-            ->withErrors(
-                'Tanggal event tidak dapat diubah karena sudah ada penjualan'
-            );
+                ->withErrors(
+                    'Tanggal event tidak dapat diubah karena sudah ada penjualan'
+                );
         }
 
         $data = [
-            'kategori_id'=>$request->kategori_id,
-            'judul'=>$request->judul,
-            'deskripsi'=>$request->deskripsi,
-            'lokasi'=>$request->lokasi,
-            'tanggal_waktu'=>$request->tanggal_waktu,
+            'kategori_id' => $request->kategori_id,
+            'judul' => $request->judul,
+            'deskripsi' => $request->deskripsi,
+            'lokasi' => $request->lokasi,
+            'tanggal_waktu' => $request->tanggal_waktu,
         ];
 
-        if($request->hasFile('gambar')){
-            if(
+        if ($request->hasFile('gambar')) {
+            if (
                 $event->gambar != 'konser.jpg'
                 &&
                 Storage::disk('public')->exists($event->gambar)
-            ){
+            ) {
                 Storage::disk('public')
-                ->delete($event->gambar);
+                    ->delete($event->gambar);
             }
 
             $data['gambar'] =
                 $request
                 ->file('gambar')
-                ->store('events','public');
+                ->store('events', 'public');
         }
 
         $event->update($data);
 
-        foreach($request->tikets as $tiket){
-            if(isset($tiket['id'])){
-                $event
-                ->tikets()
-                ->where('id',$tiket['id'])
-                ->update([
+        // Menyimpan ID tiket yang masih ada di form
+        $ticketIds = [];
 
-                    'tipe'=>$tiket['tipe'],
+        foreach ($request->tikets as $tiket) {
 
-                    'harga'=>$tiket['harga'],
+            if (isset($tiket['id']) && ! empty($tiket['id'])) {
 
-                    'stok'=>$tiket['stok'],
+                $ticketIds[] = $tiket['id'];
+
+                $event->tikets()
+                    ->where('id', $tiket['id'])
+                    ->update([
+                        'tipe' => $tiket['tipe'],
+                        'harga' => $tiket['harga'],
+                        'stok' => $tiket['stok'],
+                    ]);
+            } else {
+
+                $newTicket = $event->tikets()->create([
+                    'tipe' => $tiket['tipe'],
+                    'harga' => $tiket['harga'],
+                    'stok' => $tiket['stok'],
                 ]);
-            }
-            else{
 
-                $event->tikets()->create($tiket);
-
+                $ticketIds[] = $newTicket->id;
             }
         }
 
+        // Hapus tiket yang tidak ada lagi di form
+        if (! $event->hasSales()) {
+
+            $event->tikets()
+                ->whereNotIn('id', $ticketIds)
+                ->delete();
+        }
+
         return redirect()
-        ->route('admin.events.index')
-        ->with(
-            'success',
-            'Event berhasil diperbarui'
-        );
+            ->route('admin.events.index')
+            ->with(
+                'success',
+                'Event berhasil diperbarui'
+            );
     }
 
     public function destroy(Event $event)
     {
-        if($event->hasSales()){
+        if ($event->hasSales()) {
 
             return back()
-            ->withErrors(
-                'Event tidak dapat dihapus karena sudah memiliki penjualan'
-            );
+                ->withErrors(
+                    'Event tidak dapat dihapus karena sudah memiliki penjualan'
+                );
         }
 
-        if(
+        if (
             $event->gambar != 'konser.jpg'
             &&
             Storage::disk('public')
             ->exists($event->gambar)
-        )
-        {
+        ) {
 
             Storage::disk('public')
-            ->delete($event->gambar);
-
+                ->delete($event->gambar);
         }
 
         $event->delete();
 
         return back()
-        ->with(
-            'success',
-            'Event berhasil dihapus'
-        );
+            ->with(
+                'success',
+                'Event berhasil dihapus'
+            );
     }
 
     public function show(Event $event)
     {
         $event->load([
             'kategori',
-            'tikets'
+            'tikets',
         ]);
 
         $relatedEvents = Event::where(
-                'kategori_id',
-                $event->kategori_id
-            )
+            'kategori_id',
+            $event->kategori_id
+        )
             ->where(
                 'tanggal_waktu',
                 '>',
@@ -238,7 +246,5 @@ class EventController extends Controller
                 'relatedEvents'
             )
         );
-
     }
-
 }

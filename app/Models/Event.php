@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
-use Carbon\Carbon;
 
 class Event extends Model
 {
@@ -39,10 +38,12 @@ class Event extends Model
     {
         return $this->belongsTo(User::class);
     }
+
     public function orders()
     {
         return $this->hasMany(Order::class);
     }
+
     public function getStatusAttribute()
     {
         if ($this->tanggal_waktu->isFuture()) {
@@ -58,10 +59,12 @@ class Event extends Model
 
         return 'Completed';
     }
+
     public function hasSales()
     {
         return $this->orders()->exists();
     }
+
     public function scopeUpcoming($query)
     {
         return $query->where('tanggal_waktu', '>', now());
@@ -73,7 +76,7 @@ class Event extends Model
             'tanggal_waktu',
             [
                 now()->subHours(3),
-                now()
+                now(),
             ]
         );
     }
@@ -86,6 +89,7 @@ class Event extends Model
             now()->subHours(3)
         );
     }
+
     public function getImageUrlAttribute()
     {
         // Jika gambar berupa URL
@@ -101,5 +105,4 @@ class Event extends Model
         // Gambar default
         return asset('storage/konser.jpg');
     }
-
 }

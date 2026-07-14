@@ -28,6 +28,7 @@ class HomeController extends Controller
         $events = $eventsQuery->get()->map(function ($event) {
             // Add minimum ticket price to each event
             $event->tikets_min_harga = $event->tikets->min('harga') ?? 0;
+
             return $event;
         });
 

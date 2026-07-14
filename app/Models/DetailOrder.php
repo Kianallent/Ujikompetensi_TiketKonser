@@ -22,6 +22,4 @@ class DetailOrder extends Model
     {
         return $this->belongsTo(Tiket::class);
     }
-
-    
 }
